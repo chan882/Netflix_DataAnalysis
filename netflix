@@ -1,0 +1,98 @@
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import zipfile
+
+# Caching the data load function to speed up the app using the new caching method
+@st.cache_data
+def load_data():
+    try:
+        # Path to the zip file containing the CSV
+        zip_file_path = r"C:\Users\bsubrahmanyam\Desktop\sever log\netflix_titles.csv.zip"
+        
+        # Open the zip file and read the CSV directly
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            # Get the list of files in the zip archive
+            file_name = zip_ref.namelist()[0]  # Assuming the CSV file is the first one
+            
+            # Read the CSV file into a pandas DataFrame
+            with zip_ref.open(file_name) as my_file:
+                data = pd.read_csv(my_file)
+        
+        return data
+    except Exception as e:
+        st.error(f"Error loading the dataset: {e}")
+        return None
+
+# Load the Netflix data
+netflix_data = load_data()
+
+# Check if data is loaded
+if netflix_data is None:
+    st.error("Failed to load data.")
+else:
+    # Title of the app
+    st.title('Netflix Data Analysis')
+
+    # Display a quick overview of the dataset
+    if st.checkbox('Show Data Overview'):
+        st.subheader('Data Overview')
+        st.write(netflix_data.head())  # Display top 5 rows
+        st.write(netflix_data.info())  # Display data types and non-null values
+
+    # Pagination - Display a subset of data based on page number
+    page_size = 100
+    total_pages = len(netflix_data) // page_size + 1
+    page_number = st.number_input("Page number", min_value=1, max_value=total_pages, value=1)
+
+    # Show a subset of data based on the page number
+    start_row = (page_number - 1) * page_size
+    end_row = page_number * page_size
+    subset = netflix_data.iloc[start_row:end_row]
+
+    # Display the subset of data
+    st.subheader(f"Showing Page {page_number} of {total_pages}")
+    st.dataframe(subset)
+
+    # Genre filtering - Allow users to filter by genre
+    genre = st.selectbox("Select Genre", ['All'] + list(netflix_data['listed_in'].dropna().unique()))
+
+    if genre != 'All':
+        filtered_data = netflix_data[netflix_data['listed_in'].str.contains(genre, na=False)]
+        st.subheader(f"Filtered Data for Genre: {genre}")
+        st.dataframe(filtered_data)
+    else:
+        st.subheader("Showing All Data")
+        st.dataframe(netflix_data)
+
+    # Genre popularity plot
+    if st.checkbox('Show Genre Popularity Plot'):
+        st.subheader('Genre Popularity')
+        genres = netflix_data['listed_in'].str.split(', ').explode()
+        plt.figure(figsize=(12, 8))
+        sns.countplot(y=genres, order=genres.value_counts().index)
+        plt.title('Popularity of Genres on Netflix')
+        plt.xlabel('Count')
+        plt.ylabel('Genre')
+        st.pyplot(plt)
+
+    # Content production over the years plot
+    if st.checkbox('Show Content Production Over Years'):
+        st.subheader('Content Production Over Years')
+        plt.figure(figsize=(10, 6))
+        sns.histplot(data=netflix_data, x='release_year', bins=20, color='red')
+        plt.title('Content Production Over Years')
+        plt.xlabel('Release Year')
+        plt.ylabel('Number of Shows')
+        st.pyplot(plt)
+
+    # Ratings distribution plot
+    if st.checkbox('Show Ratings Distribution Plot'):
+        st.subheader('Content Ratings Distribution')
+        plt.figure(figsize=(10, 6))
+        sns.countplot(data=netflix_data, y='rating', order=netflix_data['rating'].value_counts().index, palette='cool')
+        plt.title('Content Ratings Distribution')
+        plt.xlabel('Count')
+        plt.ylabel('Rating')
+        st.pyplot(plt)
